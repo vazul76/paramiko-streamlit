@@ -78,7 +78,8 @@ def user_management():
     st.header("👤 User Management")
 
     if st.button("Show Users"):
-        users = execute_command("cat /etc/passwd | cut -d: -f1")
+        users = execute_command("getent passwd | "
+        "awk -F: '$6 ~ /^\\/home\\// || $6 == \"/root\" {print $1 \"    \" $6}'")
         if users:
             st.text_area("User List:", users, height=200)
 
