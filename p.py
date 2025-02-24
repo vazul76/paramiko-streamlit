@@ -1,3 +1,11 @@
+import time
+import streamlit as st
+import plotly.graph_objects as go
+
+def execute_command(command):
+    # Implementasi fungsi execute_command
+    pass
+
 def server_monitoring():
     st.header("📊 Server Monitoring")
     placeholder = st.empty()
@@ -20,7 +28,7 @@ def server_monitoring():
             ' /proc/meminfo
         """)
         
-        disk_usage = execute_command("df -h / | awk 'NR==2{print $5}' | tr -d '%'")
+        disk_usage = execute_command("df -h / | awk 'NR==2{print $3 \"/\" $2}'")
 
         # Handle jika data tidak valid
         if not all([cpu_usage, mem_usage, disk_usage]):
@@ -30,7 +38,6 @@ def server_monitoring():
         try:
             cpu_usage = float(cpu_usage)
             mem_usage = float(mem_usage)
-            disk_usage = float(disk_usage)
         except ValueError:
             st.error("Invalid monitoring data format")
             break
@@ -46,7 +53,7 @@ def server_monitoring():
                     title={'text': "CPU Usage (%)"},
                     gauge={'axis': {'range': [0, 100]}}
                 ))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key=f"cpu_usage_chart_{time.time()}")
             
             with col2:
                 fig = go.Figure(go.Indicator(
@@ -55,16 +62,10 @@ def server_monitoring():
                     title={'text': "Memory Usage (%)"},
                     gauge={'axis': {'range': [0, 100]}}
                 ))
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True, key=f"mem_usage_chart_{time.time()}")
             
             with col3:
-                fig = go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=disk_usage,
-                    title={'text': "Disk Usage (%)"},
-                    gauge={'axis': {'range': [0, 100]}}
-                ))
-                st.plotly_chart(fig, use_container_width=True)
+                st.text(f"Disk Usage: {disk_usage}")
 
         time.sleep(2)
 

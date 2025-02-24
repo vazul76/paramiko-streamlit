@@ -31,55 +31,97 @@ def ssh_terminal():
 # Fungsi untuk Server Monitoring
 def server_monitoring():
     st.header("📊 Server Monitoring")
+    
+    # Inisialisasi data history di session state
+    if 'cpu_history' not in st.session_state:
+        st.session_state.cpu_history = []
+    if 'mem_history' not in st.session_state:
+        st.session_state.mem_history = []
+    if 'disk_history' not in st.session_state:
+        st.session_state.disk_history = []
+    
     placeholder = st.empty()
+    max_history = 20  # Jumlah maksimum data point yang disimpan
 
     while 'ssh' in st.session_state and st.session_state.ssh.get_transport().is_active():
-        cpu_usage = execute_command("""
+        # Ambil data
+        cpu = execute_command("""
             awk '/cpu / {
                 total = $2 + $3 + $4 + $5 + $6 + $7 + $8 + $9 + $10;
                 idle = $5;
                 printf "%.1f", 100 - (idle * 100 / total)
             }' /proc/stat
         """)
-        mem_usage = execute_command("""
+        
+        mem = execute_command("""
             awk '
                 /MemTotal/ {total=$2}
                 /MemAvailable/ {available=$2}
                 END {printf "%.2f", ((total - available) / total) * 100}
             ' /proc/meminfo
         """)
-        disk_usage = execute_command("df -h / | awk 'NR==2{print $5}' | tr -d '%'")
+        
+        disk = execute_command("df -h / | awk 'NR==2{print $5}' | tr -d '%'")
+        disk_total = execute_command("df -h / | awk 'NR==2{print $3 \"/\" $2}'")
 
-        if not cpu_usage or not mem_usage or not disk_usage:
+        if not all([cpu, mem, disk]):
             break
 
-        cpu_usage = float(cpu_usage)
-        mem_usage = float(mem_usage)
-        disk_usage = float(disk_usage)
+        try:
+            # Update history
+            timestamp = time.strftime("%H:%M:%S")
+            st.session_state.cpu_history.append((timestamp, float(cpu)))
+            st.session_state.mem_history.append((timestamp, float(mem)))
+            st.session_state.disk_history.append((timestamp, float(disk)))
+            
+            # Batasi history
+            for metric in ['cpu_history', 'mem_history', 'disk_history']:
+                if len(st.session_state[metric]) > max_history:
+                    st.session_state[metric].pop(0)
+        except ValueError:
+            break
 
+        # Buat line chart
         with placeholder.container():
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.plotly_chart(go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=cpu_usage,
-                    title={'text': "CPU Usage (%)"},
-                    gauge={'axis': {'range': [0, 100]}}
-                )), use_container_width=True, key=f"cpu_{time.time()}")
-            with col2:
-                st.plotly_chart(go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=mem_usage,
-                    title={'text': "Memory Usage (%)"},
-                    gauge={'axis': {'range': [0, 100]}}
-                )), use_container_width=True, key=f"mem_{time.time()}")
-            with col3:
-                st.plotly_chart(go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=disk_usage,
-                    title={'text': "Disk Usage (%)"},
-                    gauge={'axis': {'range': [0, 100]}}
-                )), use_container_width=True, key=f"disk_{time.time()}")
+            
+            # Disk Chart
+            st.markdown("**Disk Usage :**")
+            st.markdown(f"<span style='font-size:40px; font-weight:bold;'>{disk_total}</span>", unsafe_allow_html=True)
+            
+            # CPU Chart
+            fig_cpu = go.Figure()
+            fig_cpu.add_trace(go.Scatter(
+                x=[t[0] for t in st.session_state.cpu_history],
+                y=[t[1] for t in st.session_state.cpu_history],
+                mode='lines+markers',
+                name='CPU Usage'
+            ))
+            fig_cpu.update_layout(
+                title='CPU Usage History (%)',
+                xaxis_title='Time',
+                yaxis_title='Usage (%)',
+                height=300
+            )
+            st.plotly_chart(fig_cpu, use_container_width=True)
+
+            # Memory Chart
+            fig_mem = go.Figure()
+            fig_mem.add_trace(go.Scatter(
+                x=[t[0] for t in st.session_state.mem_history],
+                y=[t[1] for t in st.session_state.mem_history],
+                mode='lines+markers',
+                name='Memory Usage',
+                line=dict(color='#FFA15A')
+            ))
+            fig_mem.update_layout(
+                title='Memory Usage History (%)',
+                xaxis_title='Time',
+                yaxis_title='Usage (%)',
+                height=300
+            )
+            st.plotly_chart(fig_mem, use_container_width=True)
+
+            # Disk Chart
 
         time.sleep(2)
 
