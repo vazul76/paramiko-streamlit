@@ -34,8 +34,20 @@ def server_monitoring():
     placeholder = st.empty()
 
     while 'ssh' in st.session_state and st.session_state.ssh.get_transport().is_active():
-        cpu_usage = execute_command("top -bn1 | grep 'Cpu(s)' | awk '{print $2 + $4}'")
-        mem_usage = execute_command("free -m | awk 'NR==2{printf \"%.2f\", $3*100/$2 }'")
+        cpu_usage = execute_command("""
+            awk '/cpu / {
+                total = $2 + $3 + $4 + $5 + $6 + $7 + $8 + $9 + $10;
+                idle = $5;
+                printf "%.1f", 100 - (idle * 100 / total)
+            }' /proc/stat
+        """)
+        mem_usage = execute_command("""
+            awk '
+                /MemTotal/ {total=$2}
+                /MemAvailable/ {available=$2}
+                END {printf "%.2f", ((total - available) / total) * 100}
+            ' /proc/meminfo
+        """)
         disk_usage = execute_command("df -h / | awk 'NR==2{print $5}' | tr -d '%'")
 
         if not cpu_usage or not mem_usage or not disk_usage:
