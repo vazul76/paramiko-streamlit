@@ -77,24 +77,37 @@ def server_monitoring():
 def user_management():
     st.header("👤 User Management")
 
+    # Menampilkan daftar user
     if st.button("Show Users"):
-        users = execute_command("getent passwd | "
-        "awk -F: '$6 ~ /^\\/home\\// || $6 == \"/root\" {print $1 \"    \" $6}'")
+        users = execute_command("getent passwd | awk -F: '$6 ~ /^\\/home\\// || $6 == \"/root\" {print $1 \"    \" $6}'")
         if users:
             st.text_area("User List:", users, height=200)
 
-    new_user = st.text_input("New Username")
-    if st.button("Add User"):
-        if new_user:
+    # Form untuk menambahkan user
+    with st.form("add_user_form"):
+        new_user = st.text_input("New Username")
+        new_password = st.text_input("New Password", type="password")
+        add_user_submit = st.form_submit_button("Add User")
+
+        if add_user_submit and new_user and new_password:
             result = execute_command(f"sudo useradd {new_user}")
-            st.success(f"User {new_user} added successfully!") if result == "" else st.error(result)
+            if result == "":
+                execute_command(f'echo "{new_user}:{new_password}" | sudo chpasswd')
+                st.success(f"User {new_user} added successfully!")
+            else:
+                st.error(result)
 
-    del_user = st.text_input("Delete Username")
-    if st.button("Delete User"):
-        if del_user:
+    # Form untuk menghapus user
+    with st.form("delete_user_form"):
+        del_user = st.text_input("Delete Username")
+        del_user_submit = st.form_submit_button("Delete User")
+
+        if del_user_submit and del_user:
             result = execute_command(f"sudo userdel {del_user}")
-            st.success(f"User {del_user} deleted successfully!") if result == "" else st.error(result)
-
+            if result == "":
+                st.success(f"User {del_user} deleted successfully!")
+            else:
+                st.error(result)
 # Fungsi login SSH
 def ssh_login():
     st.title("🔐 SSH Login")
